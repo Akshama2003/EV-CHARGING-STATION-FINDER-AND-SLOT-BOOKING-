@@ -1,14 +1,85 @@
-# EV-CHARGING-STATION-FINDER-AND-SLOT-BOOKING-
-In conformity with the development of this innovative product intended for the future landscape of Electric Vehicles (EVs), it is pertinent to note the strategic alignment with the forthcoming initiatives by the Indian government to establish charging stations along highways. This product is proudly conceived as a "Made in India" solution, incorporating indigenous technology, specifically featuring the Vega processor and Thejas32 ET1031.
+#include <Arduino.h>
+#include <TM1637Display.h>
 
-The Vega ET1031 represents a compact and efficient 3-stage in-order 32-bit RISC-V processor core, tailored for application in low-power Internet of Things (IoT) scenarios. Key features include RISC-V (RV32IM) Instruction Set Architecture, a 3-stage in-order pipeline implementation, Harvard architecture, a high-performance multiply/divide unit, configurable AXI4 or AHB external interface, optional Memory Protection Unit (MPU), Platform Level Interrupt Controller, Vectored interrupt support, and an Advanced Integrated Debug Controller allowing Eclipse debugging via a GDB >> openOCD >> JTAG connection.
+// Define pin numbers
+#define IRsensorPin 2
+#define ir2 11
+#define CLK 3 // Clock pin connected to Pin 3 on Aries Vega 3
+#define DIO 4 // Data pin connected to Pin 4 on Aries Vega 3
+#define RED_LED     21     // Connect Red LED pin to GPIO-0
+#define YELLOW_LED  20    // Connect Yellow LED pin to GPIO-1
+#define GREEN_LED   19    // Connect Green LED pin to GPIO-2
 
-In the physical representation of the project, diverse sensors have been employed. An Infrared (IR) proximity sensor is utilized for vehicle detection, with a recommendation for an industrial representation involving buried sensors. Charging time and display functions are managed by a 4-Digit Display. Signaling to the waiting driver is facilitated through a system employing Red (R), Yellow (Y), and Green (G) lights to indicate different phases of the charging process.
+TM1637Display display(CLK, DIO);
 
-To integrate these sensors using the Arduino Integrated Development Environment (IDE), programming has been implemented in C/C++. Data transmission from the processor to the web is facilitated through adafruit.io, with a corresponding spreadsheet documenting charging and discharging occurrences, complete with date and time records.
+unsigned long startTime = 0;
+bool timing = false;
+void setup() {
+  display.setBrightness(0x0a); // Set the brightness (adjust as needed)
+  pinMode(IRsensorPin, INPUT);
+  pinMode(ir2, INPUT);
+   pinMode(RED_LED, OUTPUT);
+  pinMode(YELLOW_LED, OUTPUT);
+  pinMode(GREEN_LED, OUTPUT);
+  Serial.begin(9600);
+}
 
-Safety considerations are addressed by incorporating user registration through a dedicated application, requiring a valid driving license. Additionally, Radio-Frequency Identification (RFID) technology is integrated into the system.
+void loop() {
+  int sensorValue = digitalRead(IRsensorPin);
+  int sensorValue2 = digitalRead(ir2);
+   if(sensorValue == LOW){
+    digitalWrite(GREEN_LED,LOW);
+     digitalWrite(RED_LED, HIGH);      // Red LED ON
+  delay(500);
+  digitalWrite(RED_LED, LOW);       // Red LED OFF
+  delay(500);
+  digitalWrite(YELLOW_LED, HIGH);   // Yellow LED ON
+  delay(500);
+  digitalWrite(YELLOW_LED, LOW);    // Yellow LED OFF
+  delay(500);
+   }
+   if(sensorValue == HIGH){
+    digitalWrite(GREEN_LED, HIGH);    // Green LED ON
+   }
 
-To mitigate scheduling conflicts during the slot booking process, a counter mechanism has been implemented. In the event that a booked slot remains unutilized, the system permits another driver to avail themselves of the charging station.
+ 
+  
+  if (sensorValue == LOW && sensorValue2 == LOW && !timing) {
+    startTime = millis(); // Start the stopwatch
+    timing = true;
+    Serial.print("Engaged\t");
+     Serial.println("  Engaged");
+  }
+   if (sensorValue == LOW && sensorValue2 == HIGH && !timing) {
+    startTime = millis(); // Start the stopwatch
+    timing = true;
+    Serial.print("Engaged\t");
+    Serial.println(" Available");
+    
+  }
+  if (sensorValue == HIGH && sensorValue2==HIGH && timing) {
+    timing = false; // Stop the stopwatch
+    display.showNumberDec(0, false); // Reset the display to zero
+    Serial.print("Available\t");
+    Serial.println("Available ");
+  }
+   if (sensorValue2 == LOW && sensorValue==HIGH && timing) {
+    timing = false; // Stop the stopwatch
+    display.showNumberDec(0, false); // Reset the display to zero
+    Serial.print("Engaged\t");
+    Serial.println("Available ");
+  }
+  
+  if (timing) {
+    unsigned long currentTime = millis();
+    unsigned long elapsedTime = currentTime - startTime;
 
-Given the existence of multiple charging stations and ports, a map feature has been incorporated to provide directional guidance and port-specific information. This comprehensive product description encapsulates the unique aspects of the innovation, establishing a foundation for professional patent consideration.
+    unsigned int minutes = (elapsedTime / 1000) / 60;
+    unsigned int seconds = (elapsedTime / 1000) % 60;
+
+    int timeToDisplay = minutes * 100 + seconds; // Format the time to display as mmss
+
+    display.showNumberDecEx(timeToDisplay, 0b01000000, true); // Display the time (no leading zeros)
+    // The 0b01000000 argument turns on the colon on most displays
+  }
+}
